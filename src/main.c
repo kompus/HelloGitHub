@@ -2,6 +2,8 @@
 #include <WinSock2.h>
 #include "types_const.h"
 
+
+//zmieniam coœ w pliku
 SOCKET Q,Server;
 u_long y=1;
 Conversation conv[MAX_CONV];
