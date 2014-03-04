@@ -66,3 +66,5 @@ void initSet(FD_SET *rfds)
 	for(i=0;i<nConv;++i)
 		FD_SET(conv[i].sock,rfds);
 }
+
+/*To jest MÓJ komentarz id=3.1415"""*/
