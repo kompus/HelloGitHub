@@ -8,31 +8,33 @@
 //zmieniam coœ w pliku
 SOCKET Q,Server;
 u_long y=1;
-//Conversation conv[MAX_CONV];
+Conversation conv[MAX_CONV];
 int nConv=0;
 char username[MAX_NAME_LEN];
 Contact user[MAX_CONTACTS];
 int nUsers;
 
 int init(char*ip,char*port);
-void getContactList();
+int getContactList();
 void initSet(FD_SET *rfds);
-int config(file);
 void sendToServer(char*msg,int len);
 void processServerMsg(char*msg);
 Contact* userByName(char*name);
 Contact* userByIp(char*ip);
-void addUser(char *data);
+void addUser(char *name,char *addr);
 void rmUser(char*data);
+void login();
+void processUMsg(Contact*u,char*msg);
 
 int main(int argc,char*argv[])
 {
 	FD_SET rfds;
 	struct timeval t={0,0};
+	int i;
+	char buf[BUFFER_SIZE];
 	if(argc>2)init(argv[1],argv[2]);
 	else init(NULL,NULL);
-	sendToServer(username,strlen(username));
-	getContactList();
+	login();
 	while(1)
 	{
 	    char buffer[BUFFER_SIZE];
@@ -43,16 +45,23 @@ int main(int argc,char*argv[])
             recv(Server,buffer,BUFFER_SIZE,0);
             processServerMsg(buffer);
         }
-
+        if(FD_ISSET(Q,&rfds))
+        {
+            if(nConv<MAX_CONV)
+                conv[nConv++].sock=accept(Q,NULL,NULL);
+        }
+        for(i=0;i<nConv;++i)
+        {
+            if(FD_ISSET(conv[i].sock,&rfds))
+            {
+                recv(conv[i].sock,buf,BUFFER_SIZE,0);
+                processUMsg(conv[i].interlocutor,buf);
+            }
+        }
 	}
 	WSACleanup();
+	endwin();
 }
-
-
-int config(){
-
-}
-
 int init(char*ip,char*port_s)
 {
     unsigned short port=PORT;
@@ -73,6 +82,8 @@ int init(char*ip,char*port_s)
         fclose(config);
     }
 	WSAStartup(MAKEWORD(2,2),&wsD);
+	initscr();
+	keypad(stdscr,TRUE);
 
 	Q=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
 	ioctlsocket(Q,FIONBIO,&y);
@@ -88,9 +99,6 @@ int init(char*ip,char*port_s)
 
 	connect(Server,(struct sockaddr*)&addrServ,sizeof(SOCKADDR_IN));
 	bind(Q,(struct sockaddr*)&addrL,sizeof(SOCKADDR_IN));
-
-	printf("Input username: ");
-	scanf("%s",username);
 	return 1;
 }
 void initSet(FD_SET *rfds)
@@ -98,57 +106,93 @@ void initSet(FD_SET *rfds)
 	int i;
 	FD_SET(Server,rfds);
 	FD_SET(Q,rfds);
-	/*for(i=0;i<nConv;++i)
-		FD_SET(conv[i].sock,rfds);*/
+	for(i=0;i<nConv;++i)
+		FD_SET(conv[i].sock,rfds);
 }
 void sendToServer(char*msg,int len)
 {
-	int ret;
-	while(len)
-	{
-		ret=send(Server,msg,len,len);
-		len-=ret;
-	}
+	if(send(Server,msg,len,0)==SOCKET_ERROR)
+    {
+        printw("%d",WSAGetLastError());
+        refresh();
+        exit(2);
+    }
 }
-
-void getContactList()
+int getContactList()
 {
-    char buffer[BUFFER_SIZE];
-    char *name,*ip;
-    recv(Server,buffer,BUFFER_SIZE,0);
+    FD_SET s;
+    char buffer[BUFFER_SIZE],*name;
+
+    FD_SET(Server,&s);
+    if(select(0,&s,NULL,NULL,NULL) == SOCKET_ERROR)
+    {
+        printw("%d",WSAGetLastError());
+        refresh();
+        exit(3);
+    }
+    if(recv(Server,buffer,BUFFER_SIZE,0)==SOCKET_ERROR)
+    {
+        printw("%d",WSAGetLastError());
+        refresh();
+        exit(4);
+    }
+    printw("DATA FROM SERVER RECEIVED");
+    printw(buffer);
+    refresh();
+    system("PAUSE");
     name=strtok(buffer,",;");
     for(nUsers=0;name;++nUsers)
     {
-        addUser(NULL);
+        addUser(name,strtok(NULL,",;"));
         name=strtok(NULL,",");
     }
+    return 1;
 }
 void processServerMsg(char*msg)
 {
-    if(strchr(msg,',')) addUser(msg);
-    else rmUser(msg);
+    if(strchr(msg,',')) addUser(strtok(msg,";,"),strtok(NULL,",;"));
+    else rmUser(strtok(msg,";"));
 }
-void addUser(char*data)
+void addUser(char*name,char*addr)
 {
-    strcpy(user[nUsers].name,strtok(data,","));
-    strcpy(user[nUsers].addr,strtok(NULL,";"));\
+    strcpy(user[nUsers].name,name);
+    strcpy(user[nUsers].addr,addr);\
     ++nUsers;
 }
-void rmUser(char*data)
+void rmUser(char*name)
 {
-    Contact*c=userByName(data);
+    Contact*c=userByName(name);
     --nUsers;
     if(c != &user[nUsers-1]) memcpy(c,c+1,nUsers-(c-user)/sizeof(Contact));
 }
 Contact* userByName(char*name)
 {
-    return user;
+    int i;
+    for(i=0;i<nUsers;++i)
+        if(!strcmp(user[i].name,name)) return &user[i];
+    return NULL;
 }
 Contact* userByIp(char*ip)
 {
-    return user;
+    int i;
+    for(i=0;i<nUsers;++i)
+        if(!strcmp(user[i].addr,ip)) return &user[i];
+    return NULL;
+}
+void login()
+{
+    do{
+        printw("Input username: ");
+        refresh();
+        scanw("%s",username);
+        printw("%s",username);
+        refresh();
+        sendToServer(username,strlen(username));
+    }while(!getContactList());
+}
+void processUMsg(Contact*u,char*msg)
+{
+
 }
 
 /*To jest MÓJ komentarz id=3.1415"""*/
-
-

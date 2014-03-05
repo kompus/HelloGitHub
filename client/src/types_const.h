@@ -11,7 +11,8 @@ typedef struct
 	char name[MAX_NAME_LEN];
 } Contact;
 
-/*typedef struct
+typedef struct
 {
 	SOCKET sock;
-} Conversation;*/
+	Contact *interlocutor;
+} Conversation;
