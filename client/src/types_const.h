@@ -2,18 +2,16 @@
 #define MAX_ADDR_LEN 16
 #define MAX_NAME_LEN 64
 #define MAX_CONV 32
+#define BUFFER_SIZE 1024
+#define MAX_CONTACTS 100
 
 typedef struct
 {
-	SOCKADDR_IN addr;
+	char addr[MAX_ADDR_LEN];
 	char name[MAX_NAME_LEN];
 } Contact;
-typedef struct
-{
-	int msg;
-	int id;
-}ServerMsg;
-typedef struct
+
+/*typedef struct
 {
 	SOCKET sock;
-} Conversation;
+} Conversation;*/
