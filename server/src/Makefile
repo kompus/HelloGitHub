@@ -1,4 +1,4 @@
-bin.exe: server.c winsock_init.o async_server.o
+bin.exe: server.o winsock_init.o async_server.o
 	gcc server.o winsock_init.o async_server.o -o bin.exe -lpdcurses -lws2_32
 	
 server.o: server.c

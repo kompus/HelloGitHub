@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <winsock2.h>
 
-const int MAXRECV = 1024;
-const int MAXNAME = 256;
+const static int MAXRECV = 1024;
+const static int MAXNAME = 256;
 
 int run(SOCKET* master, int max_clients);
 

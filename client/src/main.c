@@ -82,7 +82,7 @@ int init(char*ip,char*port_s)
         fclose(config);
     }
 	if(WSAStartup(MAKEWORD(2,2),&wsD)!=0)
-		printw("WSAStartup failed")
+		printw("WSAStartup failed");
 	else
 		printw("WSAStartup successful");
 	initscr();
