@@ -38,11 +38,13 @@ int main(int argc,char*argv[])
 	while(1)
 	{
 	    char buffer[BUFFER_SIZE];
+	    int len;
 		initSet(&rfds);
 		select(0,&rfds,NULL,NULL,&t);
 		if(FD_ISSET(Server,&rfds))
         {
-            recv(Server,buffer,BUFFER_SIZE,0);
+            len=recv(Server,buffer,BUFFER_SIZE,0);
+            if(buffer[len-1]) buffer[len]='\0';
             processServerMsg(buffer);
         }
         if(FD_ISSET(Q,&rfds))
@@ -54,13 +56,13 @@ int main(int argc,char*argv[])
         {
             if(FD_ISSET(conv[i].sock,&rfds))
             {
-                recv(conv[i].sock,buf,BUFFER_SIZE,0);
+                len=recv(conv[i].sock,buf,BUFFER_SIZE,0);
+                if(buffer[len-1]) buffer[len]='\0';
                 processUMsg(conv[i].interlocutor,buf);
             }
         }
 	}
-	WSACleanup();
-	endwin();
+	cleanup();
 }
 int init(char*ip,char*port_s)
 {
@@ -126,6 +128,7 @@ int getContactList()
 {
     FD_SET s;
     char buffer[BUFFER_SIZE],*name;
+    int len;
 
     FD_ZERO(&s);
     FD_SET(Server,&s);
@@ -135,16 +138,14 @@ int getContactList()
         refresh();
         exit(3);
     }
-    if(recv(Server,buffer,BUFFER_SIZE,0)==SOCKET_ERROR)
+    if(len=recv(Server,buffer,BUFFER_SIZE,0)==SOCKET_ERROR)
     {
         printw("%d",WSAGetLastError());
         refresh();
         exit(4);
     }
     printw("DATA FROM SERVER RECEIVED");
-    printw(buffer);
-    refresh();
-    system("PAUSE");
+    if(buffer[len-1]) buffer[len]='\0';
     name=strtok(buffer,",;");
     for(nUsers=0;name;++nUsers)
     {
@@ -161,7 +162,7 @@ void processServerMsg(char*msg)
 void addUser(char*name,char*addr)
 {
     strcpy(user[nUsers].name,name);
-    strcpy(user[nUsers].addr,addr);\
+    strcpy(user[nUsers].addr,addr);
     ++nUsers;
 }
 void rmUser(char*name)
@@ -192,12 +193,22 @@ void login()
         getstr(username);
         printw("%s",username);
         refresh();
-        sendToServer(username,strlen(username));
+        sendToServer(username,strlen(username)+1);
     }while(!getContactList());
 }
 void processUMsg(Contact*u,char*msg)
 {
 
+}
+void cleanup()
+{
+    int i;
+    closesocket(Server);
+    closesocket(Q);
+    for(i=0;i<nConv;++i)
+        closesocket(conv[i].sock);
+	WSACleanup();
+	endwin();
 }
 
 /*To jest MÓJ komentarz id=3.1415"""*/
