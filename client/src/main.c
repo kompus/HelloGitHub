@@ -81,7 +81,10 @@ int init(char*ip,char*port_s)
         fscanf(config,"%s",servAddr);
         fclose(config);
     }
-	WSAStartup(MAKEWORD(2,2),&wsD);
+	if(WSAStartup(MAKEWORD(2,2),&wsD)!=0)
+		printw("WSAStartup failed")
+	else
+		printw("WSAStartup successful");
 	initscr();
 	keypad(stdscr,TRUE);
 
@@ -104,6 +107,7 @@ int init(char*ip,char*port_s)
 void initSet(FD_SET *rfds)
 {
 	int i;
+	FD_ZERO(rfds);
 	FD_SET(Server,rfds);
 	FD_SET(Q,rfds);
 	for(i=0;i<nConv;++i)
@@ -123,6 +127,7 @@ int getContactList()
     FD_SET s;
     char buffer[BUFFER_SIZE],*name;
 
+    FD_ZERO(&s);
     FD_SET(Server,&s);
     if(select(0,&s,NULL,NULL,NULL) == SOCKET_ERROR)
     {
@@ -184,7 +189,7 @@ void login()
     do{
         printw("Input username: ");
         refresh();
-        scanw("%s",username);
+        getstr(username);
         printw("%s",username);
         refresh();
         sendToServer(username,strlen(username));
