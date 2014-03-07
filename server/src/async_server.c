@@ -1,48 +1,17 @@
 #include "async_server.h"
 
-int receiveFromSocket(int client_id, char* buffer, SOCKET* clients, char** names, int max_clients)
+void removeUser(SOCKET* clients, char* name, int max_clients)
 {
-	int received, i, addrlen = sizeof(struct sockaddr_in);
-	struct sockaddr_in address;
-	SOCKET sock = clients[client_id];
-	
-	getpeername(sock, (struct sockaddr*)&address, (int*)&addrlen);
-	received = recv(sock, buffer, MAXRECV, 0);
-	
-    if(received == SOCKET_ERROR)
-	{
-		int error_code = WSAGetLastError();
-		if(error_code == WSAECONNRESET)
-		{
-			printf("Client disconnected unexpectedly, IP: %s, port: %d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-			closesocket(sock);
-			clients[client_id] = 0;
-			return -1;
-		}
-		else
-		{
-			printf("recv failed with error code: %d\n", error_code);
-			return -2;
-		}
-	}
-	else if(received == 0)
+	int i;
+	strcat(name, ";");
+	printf("Wysylam informacje: '%s'\n", name);
+	for(i = 0; i < max_clients; i++)
     {
-		printf("Client disconnected, IP: %s, port: %d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-        closesocket(sock);
-	}
-	if(received == SOCKET_ERROR || received == 0)
-	{
-		strcpy(buffer, names[client_id]);
-		strcat(buffer, ";");
-		for(i = 0; i < max_clients; i++)
-    {
-		if(client_id != i && clients[i] != 0)
+		if(clients[i] != 0)
 		{
-			send(clients[i], buffer, strlen(buffer), 0);
+			send(clients[i], name, strlen(name), 0);
         }
 	}
-	}
-	return received;
 }
 int addNewUser(SOCKET* new_socket, SOCKET* clients, char** names, int max_clients)
 {
@@ -51,6 +20,7 @@ int addNewUser(SOCKET* new_socket, SOCKET* clients, char** names, int max_client
 	struct sockaddr_in address;
 	addrlen = sizeof(struct sockaddr_in);
 	received = recv(*new_socket, buffer, MAXRECV, 0);
+	printf("Odebrano: '%s'\n", buffer);
 	if(received == SOCKET_ERROR)
 	{
 		int error_code = WSAGetLastError();
@@ -84,6 +54,7 @@ int addNewUser(SOCKET* new_socket, SOCKET* clients, char** names, int max_client
             break;
         }
 	}
+	printf("Przygotowywuje liste\n");
 	strcpy(buffer, "");
 	for(i = 0; i < max_clients; i++)
     {
@@ -96,12 +67,15 @@ int addNewUser(SOCKET* new_socket, SOCKET* clients, char** names, int max_client
             strcat(buffer, ";");
         }
 	}
+	if(strlen(buffer) == 0) strcpy(buffer, ";");
+	printf("Wysle: '%s'\n", buffer);
 	if(send(*new_socket, buffer, strlen(buffer), 0) != strlen(buffer))
 	{
 		printf("Sending online list failed.\n");
 		closesocket(*new_socket);
 		return -4;
 	}
+	printf("Wyslalem liste.\n");
 	getpeername(*new_socket, (struct sockaddr*)&address, (int*)&addrlen);
 	strcpy(buffer, names[id]);
 	strcat(buffer, ",");
@@ -114,7 +88,54 @@ int addNewUser(SOCKET* new_socket, SOCKET* clients, char** names, int max_client
 			send(clients[i], buffer, strlen(buffer), 0);
         }
 	}
+	printf("Obsluzylem nowego klienta.\n\n");
 	return 0;
+}
+int receiveFromSocket(int client_id, char* buffer, SOCKET* clients, char** names, int max_clients)
+{
+	int received, i, addrlen = sizeof(struct sockaddr_in);
+	struct sockaddr_in address;
+	
+	getpeername(clients[client_id], (struct sockaddr*)&address, (int*)&addrlen);
+	received = recv(clients[client_id], buffer, MAXRECV, 0);
+	
+    if(received == SOCKET_ERROR)
+	{
+		int error_code = WSAGetLastError();
+		if(error_code == WSAECONNRESET)
+		{
+			printf("Client disconnected unexpectedly, IP: %s, port: %d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+			closesocket(clients[client_id]);
+			clients[client_id] = 0;
+			removeUser(clients, names[client_id], max_clients);
+			return -1;
+		}
+		else
+		{
+			printf("recv failed with error code: %d\n", error_code);
+			return -2;
+		}
+	}
+	else if(received == 0)
+    {
+		printf("Client disconnected, IP: %s, port: %d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+        closesocket(clients[client_id]);
+        clients[client_id] = 0;
+        removeUser(clients, names[client_id], max_clients);
+	}
+	if(received == SOCKET_ERROR || received == 0)
+	{
+		strcpy(buffer, names[client_id]);
+		strcat(buffer, ";");
+		for(i = 0; i < max_clients; i++)
+    {
+		if(client_id != i && clients[i] != 0)
+		{
+			send(clients[i], buffer, strlen(buffer), 0);
+        }
+	}
+	}
+	return received;
 }
 int run(SOCKET* master, int max_clients)
 {
@@ -154,9 +175,7 @@ int run(SOCKET* master, int max_clients)
                         
             // tutaj bedzie odbywac sie pobieranie nicku oraz wysylanie listy uzytkownikow
             //received = recv(sock, buffer, MAXRECV, 0);
-            if(addNewUser(&new_socket, clients, names, max_clients) == 0)
-            {
-			}
+            addNewUser(&new_socket, clients, names, max_clients);
         }
         for(i = 0; i < max_clients; i++) 
         {  
