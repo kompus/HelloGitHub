@@ -70,7 +70,8 @@ int init(char*ip,char*port_s)
 	char servAddr[MAX_ADDR_LEN];//server address
 	SOCKADDR_IN addrL,addrServ; //listen & server addresses
 	WSADATA wsD;                //useless
-
+	initscr();
+	keypad(stdscr,TRUE);
     if(ip)
     {
         sscanf(port_s,"%hd",&port);
@@ -79,16 +80,25 @@ int init(char*ip,char*port_s)
     else
     {
         FILE *config=fopen("config.txt","r");
-        if(!config) exit(1);
+        if(!config){
+            printw("%d",WSAGetLastError());
+            printw("Failed to read from file");
+            refresh();
+            exit(1);
+        }
         fscanf(config,"%s",servAddr);
         fclose(config);
+
     }
-	if(WSAStartup(MAKEWORD(2,2),&wsD)!=0)
+	if(WSAStartup(MAKEWORD(2,2),&wsD)){
+        printw("%d",WSAGetLastError());
 		printw("WSAStartup failed");
+		refresh();
+		WSACleanup();
+		exit(11);}
 	else
 		printw("WSAStartup successful");
-	initscr();
-	keypad(stdscr,TRUE);
+	
 
 	Q=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
 	ioctlsocket(Q,FIONBIO,&y);
@@ -102,8 +112,19 @@ int init(char*ip,char*port_s)
 	addrL.sin_addr.S_un.S_addr=inet_addr("1.1.1.1");
 	addrServ.sin_addr.S_un.S_addr=inet_addr(servAddr);
 
-	connect(Server,(struct sockaddr*)&addrServ,sizeof(SOCKADDR_IN));
-	bind(Q,(struct sockaddr*)&addrL,sizeof(SOCKADDR_IN));
+		if(connect(Server,(struct sockaddr*)&addrServ,sizeof(SOCKADDR_IN))==SOCKET_ERROR)
+    {
+        printw("%d",WSAGetLastError());
+        printw(" - Failed to connect to server\n");
+        refresh();
+    }
+
+	if(bind(Q,(struct sockaddr*)&addrL,sizeof(SOCKADDR_IN))==SOCKET_ERROR)
+    {
+        printw("%d",WSAGetLastError());
+        printw(" - Failed to associate with socket\n");
+        refresh();
+    }
 	return 1;
 }
 void initSet(FD_SET *rfds)
