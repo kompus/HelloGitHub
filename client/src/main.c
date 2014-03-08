@@ -26,12 +26,11 @@ void rmUser(char*data);
 void login();
 void processUMsg(Contact*u, char*msg);
 void cleanup();
+void displayuser();
 
 int main(int argc, char*argv[]) {
 	FD_SET rfds;
 	struct timeval t = { 1, 0 };
-	int i,error;
-	char buf[BUFFER_SIZE];
 	if (argc > 2)
 		init(argv[1], argv[2]);
 	else
@@ -47,13 +46,11 @@ int main(int argc, char*argv[]) {
             refresh();
 		}
 		if (FD_ISSET(Server, &rfds)) {
-			if(len = recv(Server, buffer, BUFFER_SIZE, 0)==SOCKET_ERROR){
+			if((len = recv(Server, buffer, BUFFER_SIZE, 0))==SOCKET_ERROR){
                 printw("Connection lost");
                 refresh();
-                exit(20)
+                exit(20);
 			}
-			printw(buffer);
-			printw('a');
 			if (buffer[len - 1])
 				buffer[len] = '\0';
 			processServerMsg(buffer);
@@ -71,6 +68,7 @@ int main(int argc, char*argv[]) {
 				processUMsg(conv[i].interlocutor, buf);
 			}
 		}*/
+		displayuser();
 	}
 	cleanup();
 }
@@ -142,20 +140,13 @@ int getContactList() {
 	char buffer[BUFFER_SIZE], *name;
 	int len;
 
-	if (len = recv(Server, buffer, BUFFER_SIZE, 0) == SOCKET_ERROR) {
+	if ((len = recv(Server, buffer, BUFFER_SIZE, 0)) == SOCKET_ERROR) {
 		printw("%d", WSAGetLastError());
 		refresh();
 		exit(4);
 	}
-	printw("\nDATA FROM SERVER RECEIVED\n");
-    printw(buffer);
-    printw("\n");
-	if (buffer[len - 1])
-		buffer[len] = '\0';
-		name = strtok(buffer, ",;");
-	for (nUsers = 0; name;NULL) {
-        printw(nUsers);
-        refresh();
+    name = strtok(buffer, ",;");
+	for (nUsers = 0; name;) {
 		addUser(name, strtok(NULL, ",;"));
 		name = strtok(NULL, ",");
 	}
@@ -232,10 +223,10 @@ void cleanup() {
 	WSACleanup();
 	endwin();
 }
-void diplayuser(){
+void displayuser(){
     int i;
     clear();
-    printw("Logged users:\n");
+    printw("Logged users %10d\n",nUsers);
     printw("%-32s IP\n","Users");
     for(i=0;i<nUsers;++i)
         printw("%-32s %s\n",user[i].name,user[i].addr);
