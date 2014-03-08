@@ -47,7 +47,10 @@ int main(int argc, char*argv[]) {
             refresh();
 		}
 		if (FD_ISSET(Server, &rfds)) {
-			len = recv(Server, buffer, BUFFER_SIZE, 0);
+			if(len = recv(Server, buffer, BUFFER_SIZE, 0)==SOCKET_ERROR){
+                printw("Connection lost");
+                refresh();
+			}
 			printw(buffer);
 			printw('a');
 			if (buffer[len - 1])
@@ -227,6 +230,15 @@ void cleanup() {
 		closesocket(conv[i].sock);
 	WSACleanup();
 	endwin();
+}
+void diplayuser(){
+    int i;
+    clear();
+    printw("Logged users:\n");
+    printw("%-32s IP\n","Users");
+    for(i=0;i<nUsers;++i)
+        printw("%-32s %s\n",user[i].name,user[i].addr);
+    refresh();
 }
 
 /*To jest MÓJ komentarz id=3.1415"""*/
