@@ -159,20 +159,24 @@ int getContactList() {
 }
 
 void processServerMsg(char*msg) {
-	if (strchr(msg, ','))
-		addUser(strtok(msg, ";,"), strtok(NULL, ",;"));
+	if (strchr(msg, ',')){
+		char* name=strtok(msg,";,");
+        addUser(name, strtok(NULL, ",;"));
+	}
 	else
 		rmUser(strtok(msg, ";"));
 }
 
 void addUser(char*name, char*addr) {
+    if(!userByName(name)){
 	strcpy(user[nUsers].name, name);
 	strcpy(user[nUsers].addr, addr);
 	printw(user[nUsers].name);
 	printw(user[nUsers].addr);
 	++nUsers;
 	if (!name || !addr) return;
-}
+}}
+
 
 void rmUser(char*name) {
     if(nUsers!=0){
@@ -181,7 +185,6 @@ void rmUser(char*name) {
 	if (c != &user[nUsers])
 		memcpy(c, c + 1, nUsers - (c - user) / sizeof(Contact));
     }
-}
 }
 
 Contact* userByName(char*name) {
