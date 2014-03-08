@@ -50,6 +50,7 @@ int main(int argc, char*argv[]) {
 			if(len = recv(Server, buffer, BUFFER_SIZE, 0)==SOCKET_ERROR){
                 printw("Connection lost");
                 refresh();
+                exit(20)
 			}
 			printw(buffer);
 			printw('a');
