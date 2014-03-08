@@ -12,7 +12,7 @@ Conversation conv[MAX_CONV];
 int nConv = 0;
 char username[MAX_NAME_LEN];
 Contact user[MAX_CONTACTS];
-int nUsers;
+int nUsers = 0;
 
 int init(char*ip, char*port);
 int getContactList();
@@ -25,11 +25,12 @@ void addUser(char *name, char *addr);
 void rmUser(char*data);
 void login();
 void processUMsg(Contact*u, char*msg);
+void cleanup();
 
 int main(int argc, char*argv[]) {
 	FD_SET rfds;
-	struct timeval t = { 0, 0 };
-	int i;
+	struct timeval t = { 1, 0 };
+	int i,error;
 	char buf[BUFFER_SIZE];
 	if (argc > 2)
 		init(argv[1], argv[2]);
@@ -40,10 +41,15 @@ int main(int argc, char*argv[]) {
 		char buffer[BUFFER_SIZE];
 		int len;
 		initSet(&rfds);
-		// Brak sprawdzania bledu z selecta!
-		select(0, &rfds, NULL, NULL, &t);
+		if(select(0, &rfds, NULL, NULL, &t)==SOCKET_ERROR){
+            printw("%d",WSAGetLastError());
+            printw(" - socket selection failed");
+            refresh();
+		}
 		if (FD_ISSET(Server, &rfds)) {
 			len = recv(Server, buffer, BUFFER_SIZE, 0);
+			printw(buffer);
+			printw('a');
 			if (buffer[len - 1])
 				buffer[len] = '\0';
 			processServerMsg(buffer);
@@ -96,9 +102,7 @@ int init(char*ip, char*port_s) {
 		printw("WSAStartup successful\n");
 
 	//Q = socket(AF_INET, SOCK_STREAM, 0);
-	//ioctlsocket(Q,FIONBIO,&y);
 	Server = socket(AF_INET, SOCK_STREAM, 0);
-	//ioctlsocket(Server,FIONBIO,&y);
 
 	addrServ.sin_family = AF_INET;
 	addrServ.sin_port = htons(port);
@@ -108,8 +112,9 @@ int init(char*ip, char*port_s) {
 		printw("%d", WSAGetLastError());
 		printw(" - Failed to connect to server\n");
 		refresh();
+		exit(1);
 	}
-	
+
 	return 1;
 }
 
@@ -139,10 +144,14 @@ int getContactList() {
 		exit(4);
 	}
 	printw("\nDATA FROM SERVER RECEIVED\n");
+    printw(buffer);
+    printw("\n");
 	if (buffer[len - 1])
 		buffer[len] = '\0';
-	name = strtok(buffer, ",;");
-	for (nUsers = 0; name; ++nUsers) {
+		name = strtok(buffer, ",;");
+	for (nUsers = 0; name;NULL) {
+        printw(nUsers);
+        refresh();
 		addUser(name, strtok(NULL, ",;"));
 		name = strtok(NULL, ",");
 	}
@@ -159,14 +168,20 @@ void processServerMsg(char*msg) {
 void addUser(char*name, char*addr) {
 	strcpy(user[nUsers].name, name);
 	strcpy(user[nUsers].addr, addr);
+	printw(user[nUsers].name);
+	printw(user[nUsers].addr);
 	++nUsers;
+	if (!name || !addr) return;
 }
 
 void rmUser(char*name) {
+    if(nUsers!=0){
 	Contact*c = userByName(name);
 	--nUsers;
-	if (c != &user[nUsers - 1])
+	if (c != &user[nUsers])
 		memcpy(c, c + 1, nUsers - (c - user) / sizeof(Contact));
+    }
+}
 }
 
 Contact* userByName(char*name) {
@@ -190,7 +205,6 @@ void login() {
 		printw("Input username: ");
 		refresh();
 		getstr(username);
-		printw("%s", username);
 		refresh();
 		sendToServer(username, strlen(username));
 	} while (!getContactList());
