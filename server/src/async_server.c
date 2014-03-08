@@ -93,7 +93,7 @@ int addNewUser(SOCKET* new_socket, SOCKET* clients, char** names, int max_client
 }
 int receiveFromSocket(int client_id, char* buffer, SOCKET* clients, char** names, int max_clients)
 {
-	int received, i, addrlen = sizeof(struct sockaddr_in);
+	int received, addrlen = sizeof(struct sockaddr_in);
 	struct sockaddr_in address;
 	
 	getpeername(clients[client_id], (struct sockaddr*)&address, (int*)&addrlen);
@@ -122,18 +122,6 @@ int receiveFromSocket(int client_id, char* buffer, SOCKET* clients, char** names
         closesocket(clients[client_id]);
         clients[client_id] = 0;
         removeUser(clients, names[client_id], max_clients);
-	}
-	if(received == SOCKET_ERROR || received == 0)
-	{
-		strcpy(buffer, names[client_id]);
-		strcat(buffer, ";");
-		for(i = 0; i < max_clients; i++)
-    {
-		if(client_id != i && clients[i] != 0)
-		{
-			send(clients[i], buffer, strlen(buffer), 0);
-        }
-	}
 	}
 	return received;
 }
