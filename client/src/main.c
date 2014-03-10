@@ -7,35 +7,44 @@
 //zmieniam coœ w pliku
 //SOCKET Q, Server;
 SOCKET Server;
-u_long y = 1;
-Conversation conv[MAX_CONV];
-int nConv = 0;
 char username[MAX_NAME_LEN];
 Contact user[MAX_CONTACTS];
-int nUsers = 0;
+Conversation conv[MAX_CONV];
+int nUsers = 0,nConv = 0;
+WINDOW *input, *contactList, *msg;
+CRITICAL_SECTION cs;
 
 int init(char*ip, char*port);
 int getContactList();
-void initSet(FD_SET *rfds);
+void login();
+
 void sendToServer(char*msg, int len);
 void processServerMsg(char*msg);
+void processUMsg(Contact*u, char*msg);
+
 Contact* userByName(char*name);
 Contact* userByIp(char*ip);
 void addUser(char *name, char *addr);
 void rmUser(char*data);
-void login();
-void processUMsg(Contact*u, char*msg);
+void displayuser(WINDOW* w);
+
+Conversation beginConv();   //lets user begin new conversation
+void InputThread(void*);
+
+void initSet(FD_SET *rfds);
 void cleanup();
-void displayuser();
 
 int main(int argc, char*argv[]) {
 	FD_SET rfds;
 	struct timeval t = { 1, 0 };
+
 	if (argc > 2)
 		init(argv[1], argv[2]);
 	else
 		init(NULL, NULL);
 	login();
+	displayuser(stdscr);
+
 	while (1) {
 		char buffer[BUFFER_SIZE];
 		int len;
@@ -54,6 +63,7 @@ int main(int argc, char*argv[]) {
 			if (buffer[len - 1])
 				buffer[len] = '\0';
 			processServerMsg(buffer);
+			displayuser(stdscr);
 		}
 		// Nie rozumiem o co chodzi?
 		/*if (FD_ISSET(Q, &rfds)) {
@@ -68,19 +78,25 @@ int main(int argc, char*argv[]) {
 				processUMsg(conv[i].interlocutor, buf);
 			}
 		}*/
-		displayuser();
 	}
 	cleanup();
 }
 int init(char*ip, char*port_s) {
-	unsigned short port = PORT;
+	unsigned short port;
 	char servAddr[MAX_ADDR_LEN]; //server address
 	SOCKADDR_IN addrServ; //listen & server addresses
 	WSADATA wsD;                //useless
+
 	initscr();
 	keypad(stdscr, TRUE);
+	start_color();
+	init_pair(1,COLOR_RED,COLOR_BLACK);
+	init_pair(2,COLOR_BLUE,COLOR_BLACK);
+	init_pair(3,COLOR_BLACK,COLOR_WHITE);
+	init_pair(4,COLOR_WHITE,COLOR_BLACK);
+
 	if (ip) {
-		sscanf(port_s, "%hd", &port);
+		sscanf(port_s, "%hu", &port);
 		strcpy(servAddr, ip);
 	} else {
 		FILE *config = fopen("config.txt", "r");
@@ -90,7 +106,7 @@ int init(char*ip, char*port_s) {
 			refresh();
 			exit(1);
 		}
-		fscanf(config, "%s", servAddr);
+		fscanf(config, "%s %hu", servAddr,&port);
 		fclose(config);
 
 	}
@@ -116,6 +132,8 @@ int init(char*ip, char*port_s) {
 		refresh();
 		exit(1);
 	}
+
+	InitializeCriticalSection(&cs);
 
 	return 1;
 }
@@ -172,7 +190,6 @@ void addUser(char*name, char*addr) {
 	if (!name || !addr) return;
 }}
 
-
 void rmUser(char*name) {
     if(nUsers!=0){
 	Contact*c = userByName(name);
@@ -221,16 +238,71 @@ void cleanup() {
 	for (i = 0; i < nConv; ++i)
 		closesocket(conv[i].sock);
 	WSACleanup();
+	DeleteCriticalSection(&cs);
 	endwin();
 }
-void displayuser(){
+void displayuser(WINDOW *w){
     int i;
-    clear();
-    printw("Logged users %10d\n",nUsers);
-    printw("%-32s IP\n","Users");
+    wclear(w);
+    wprintw(w,"Logged users %10d\n",nUsers);
     for(i=0;i<nUsers;++i)
-        printw("%-32s %s\n",user[i].name,user[i].addr);
-    refresh();
+        wprintw(w,"%-s\n",user[i].name);
+    wrefresh(w);
 }
-
+void inputThread(void*notNeeded) {
+    Conversation c;
+    char buffer[BUFFER_SIZE];
+    c=beginConv();
+    while(1)
+    {
+        wgetstr(input,buffer);
+        EnterCriticalSection(&cs);
+        if(send(c.sock, buffer,
+                strlen(buffer)+1, 0) == SOCKET_ERROR)
+        {
+            wprintw(msg,"Connection lost...");
+            return;
+        }
+        attron(COLOR_PAIR(1));
+        wprintw(msg,"%s:\n%s",username,buffer);
+        LeaveCriticalSection(&cs);
+    }
+}
+Conversation beginConv() {
+    int id_sel=0,i;
+    Conversation ret;
+    SOCKADDR_IN addr;
+    while(1)
+    {
+        switch(wgetch(contactList))
+        {
+        case KEY_UP:
+            if(id_sel > 0) id_sel-=2;
+        case KEY_DOWN:
+            if(id_sel < nUsers-1) ++id_sel;
+            for(i=0; i < nUsers; ++i)
+            {
+                if(i == id_sel)
+                {
+                    attron(COLOR_PAIR(3));
+                    wprintw(contactList,"%s",user[i].name);
+                    attron(COLOR_PAIR(4));
+                }
+                else wprintw(contactList,"%s",user[i].name);
+            }
+            wrefresh(contactList);
+            break;
+        case KEY_ENTER:
+            ret.interlocutor = &user[i];
+            ret.sock=socket(AF_INET, SOCK_STREAM, 0);
+            ZeroMemory(&addr,sizeof(SOCKADDR_IN));
+            addr.sin_family=AF_INET;
+            addr.sin_port=PORT;
+            addr.sin_addr.S_un.S_addr=inet_addr(user[i].addr);
+            connect(ret.sock,(struct sockaddr*)&addr,sizeof(SOCKADDR_IN));
+            return ret;
+            break;
+        }
+    }
+}
 /*To jest MÓJ komentarz id=3.1415"""*/
