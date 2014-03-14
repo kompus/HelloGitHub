@@ -2,6 +2,7 @@
 #include <string.h>
 #include <WinSock2.h>
 #include <curses.h>
+#include <process.h>
 #include "types_const.h"
 
 //zmieniam coœ w pliku
@@ -26,10 +27,10 @@ Contact* userByName(char*name);
 Contact* userByIp(char*ip);
 void addUser(char *name, char *addr);
 void rmUser(char*data);
-void displayuser(WINDOW* w);
+void displayuser(WINDOW* w,int id_sel);
 
 Conversation beginConv();   //lets user begin new conversation
-void InputThread(void*);
+void _cdecl InputThread(void*);
 
 void initSet(FD_SET *rfds);
 void cleanup();
@@ -43,7 +44,7 @@ int main(int argc, char*argv[]) {
 	else
 		init(NULL, NULL);
 	login();
-	displayuser(stdscr);
+	_beginthread(InputThread,0,NULL);
 
 	while (1) {
 		char buffer[BUFFER_SIZE];
@@ -63,7 +64,7 @@ int main(int argc, char*argv[]) {
 			if (buffer[len - 1])
 				buffer[len] = '\0';
 			processServerMsg(buffer);
-			displayuser(stdscr);
+			displayuser(contactList,-1);
 		}
 		// Nie rozumiem o co chodzi?
 		/*if (FD_ISSET(Q, &rfds)) {
@@ -89,11 +90,16 @@ int init(char*ip, char*port_s) {
 
 	initscr();
 	keypad(stdscr, TRUE);
+	msg=newwin(22,50,0,30);
+	input=newwin(2,50,23,30);
+	contactList=newwin(25,30,0,0);
 	start_color();
 	init_pair(1,COLOR_RED,COLOR_BLACK);
 	init_pair(2,COLOR_BLUE,COLOR_BLACK);
 	init_pair(3,COLOR_BLACK,COLOR_WHITE);
 	init_pair(4,COLOR_WHITE,COLOR_BLACK);
+	keypad(contactList, TRUE);
+	scrollok(msg,TRUE);
 
 	if (ip) {
 		sscanf(port_s, "%hu", &port);
@@ -163,9 +169,10 @@ int getContactList() {
 		refresh();
 		exit(4);
 	}
+	if(buffer[len-1]) buffer[len]='\0';
     name = strtok(buffer, ",;");
 	for (nUsers = 0; name;) {
-		addUser(name, strtok(NULL, ",;"));
+		addUser(name, strtok(NULL, ";"));
 		name = strtok(NULL, ",");
 	}
 	return 1;
@@ -181,13 +188,13 @@ void processServerMsg(char*msg) {
 }
 
 void addUser(char*name, char*addr) {
+    if (!name || !addr) return;
     if(!userByName(name)){
 	strcpy(user[nUsers].name, name);
 	strcpy(user[nUsers].addr, addr);
-	printw(user[nUsers].name);
-	printw(user[nUsers].addr);
+	//printw("%s ",user[nUsers].name);
+	//printw("%s\n",user[nUsers].addr);
 	++nUsers;
-	if (!name || !addr) return;
 }}
 
 void rmUser(char*name) {
@@ -241,15 +248,23 @@ void cleanup() {
 	DeleteCriticalSection(&cs);
 	endwin();
 }
-void displayuser(WINDOW *w){
+void displayuser(WINDOW *w,int id_sel){
     int i;
     wclear(w);
-    wprintw(w,"Logged users %10d\n",nUsers);
+    wprintw(w,"Logged users %2d\n",nUsers);
     for(i=0;i<nUsers;++i)
-        wprintw(w,"%-s\n",user[i].name);
+    {
+        if(i == id_sel)
+        {
+            wattron(w,COLOR_PAIR(3));
+            wprintw(w,"%-s\n",user[i].name);
+            wattroff(w,COLOR_PAIR(3));
+        }
+        else wprintw(w,"%-s\n",user[i].name);
+    }
     wrefresh(w);
 }
-void inputThread(void*notNeeded) {
+void _cdecl InputThread(void*notNeeded) {
     Conversation c;
     char buffer[BUFFER_SIZE];
     c=beginConv();
@@ -269,40 +284,37 @@ void inputThread(void*notNeeded) {
     }
 }
 Conversation beginConv() {
-    int id_sel=0,i;
+    int id_sel=0;
     Conversation ret;
     SOCKADDR_IN addr;
+    displayuser(contactList,id_sel);
     while(1)
     {
-        switch(wgetch(contactList))
+        wrefresh(contactList);
+        int ch=wgetch(contactList);
+        EnterCriticalSection(&cs);
+        while(id_sel > nUsers)
+            --id_sel;
+        switch(ch)
         {
         case KEY_UP:
             if(id_sel > 0) id_sel-=2;
         case KEY_DOWN:
             if(id_sel < nUsers-1) ++id_sel;
-            for(i=0; i < nUsers; ++i)
-            {
-                if(i == id_sel)
-                {
-                    attron(COLOR_PAIR(3));
-                    wprintw(contactList,"%s",user[i].name);
-                    attron(COLOR_PAIR(4));
-                }
-                else wprintw(contactList,"%s",user[i].name);
-            }
-            wrefresh(contactList);
+            displayuser(contactList,id_sel);
             break;
-        case KEY_ENTER:
-            ret.interlocutor = &user[i];
+        case '\n':
+            ret.interlocutor = &user[id_sel];
             ret.sock=socket(AF_INET, SOCK_STREAM, 0);
             ZeroMemory(&addr,sizeof(SOCKADDR_IN));
             addr.sin_family=AF_INET;
             addr.sin_port=PORT;
-            addr.sin_addr.S_un.S_addr=inet_addr(user[i].addr);
+            addr.sin_addr.S_un.S_addr=inet_addr(user[id_sel].addr);
             connect(ret.sock,(struct sockaddr*)&addr,sizeof(SOCKADDR_IN));
             return ret;
             break;
         }
+        LeaveCriticalSection(&cs);
     }
 }
 /*To jest MÓJ komentarz id=3.1415"""*/
